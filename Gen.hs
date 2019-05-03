@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 import qualified Data.Map.Strict as Map
 import Control.Monad.Trans.State.Strict
-
+import Control.Arrow (first, second)
 -- mostly stolen from
 -- https://github.com/alanz/HaRe/blob/master/old/tools/base/parse2/LexerGen/FSM.hs
 
@@ -12,31 +12,24 @@ data R t
   | Concat (R t) (R t)
   | Many (R t)
 
-data Edge t = Epsilon | T t deriving (Eq,Ord,Show)
+data Edge t = E | T t deriving (Eq,Ord,Show)
 type M t s = Map.Map s (Map.Map (Edge t) s)
-newtype NFA t s = NFA (M t s) deriving (Show)
+data NFA t s = NFA { start:: s, end:: s, edges:: M t s } deriving (Show)
 
-addedge :: Ord s => Ord t => s -> Edge t -> s -> State (s, M t s) ()
-addedge s e g = do
-  (cur, edges) <- get
-  let edges' = Map.insertWith Map.union s (Map.singleton e g) edges
-  put (cur, edges')
-
-newNode :: Enum s => State (s, M t s) s
-newNode = do
-  (cur, edges) <- get
-  put (succ cur, edges)
-  pure cur
-
-compile :: Enum s => Ord s => Ord t => R t -> State (s, M t s) ()
-compile re = do
-  n1 <- newNode
-  n2 <- newNode
-  go n1 n2 re
+compile re = snd $ (`execState` (0, Map.empty)) $ do
+  nstart <- newNode
+  nend <- newNode
+  go nstart nend re
+  NFA nstart nend . snd <$> get
     where
+      addedge s e g = modify $ second $ Map.insertWith Map.union s $ Map.singleton e g
+      newNode = do
+        cur <- fst <$> get
+        modify $ first succ
+        pure cur
       go s g =
         \case
-          Empty -> addedge s Epsilon g
+          Empty -> addedge s E g
           Symbol sym -> addedge s (T sym) g
           Union r1 r2 -> do
             go s g r1
@@ -47,21 +40,19 @@ compile re = do
             go tmp g r2
           Many r -> do
             tmp <- newNode
-            addedge s Epsilon tmp
+            addedge s E tmp
             go tmp tmp r
-            addedge tmp Epsilon g
-
-comp re = snd (compile re `execState` (0, Map.empty))
+            addedge tmp E g
 
 -- test
 range start end = foldr1 Union $ map Symbol [start .. end]
-digit = range '0' '9'
+digit = range '0' '1'
 digits = digit `Concat` Many digit
 
-alpha = range 'a' 'z' `Union` range 'A' 'Z'
+alpha = range 'a' 'b' `Union` range 'A' 'B'
 alphanum = alpha `Union` digit
 
-iden = alpha `Concat` (Many alphanum)
+iden = alpha `Concat` Many alphanum
 
 ws = Many $ Symbol ' '
 
