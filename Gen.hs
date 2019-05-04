@@ -3,7 +3,9 @@
 module Gen where
 
 import           Control.Arrow (first, second)
+import           Control.Monad (unless)
 import           Control.Monad.Trans.State.Strict
+import           Data.Foldable (traverse_)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe (catMaybes)
@@ -24,7 +26,7 @@ data NFA t s = NFA { start:: s, end:: s, edges:: M t s } deriving (Show)
 
 insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
 
-compile re = (`evalState` (0, Map.empty)) $ do
+nfa re = (`evalState` (0, Map.empty)) $ do
   nstart <- newNode
   nend <- newNode
   go nstart nend re
@@ -71,3 +73,37 @@ epclose = closure . followEdge Nothing
 eval m cur s = followSym s m $ epclose m cur
 
 match (NFA start end m) = Set.member end . epclose m . foldl (eval m) (Set.singleton start)
+
+setEdges :: Ord t => Ord s => M t s -> Set s -> Set (Maybe t)
+setEdges m = Set.foldl (\set s -> foldr Set.insert set $ maybe [] Map.keys $ Map.lookup s m) Set.empty
+
+setEdgeSymbols m s = Set.fromList $ catMaybes $ Set.toList $ setEdges m s
+
+type MD t s = Map (Set s) (Map t (Set s))
+data DFA t s = DFA (Set s) (Set s) (MD t s) deriving (Show)
+
+matchDFA (DFA start end dfaEdges) = go start
+  where
+    go cur =
+      \case
+        [] -> end `Set.isSubsetOf` cur
+        s:ss ->
+          case lookupEdge s dfaEdges cur of
+            Nothing -> False
+            Just new -> go new ss
+
+dfa (NFA start end m) =
+  DFA
+  (epclose m $ Set.singleton start)
+  (epclose m $ Set.singleton end) $
+  (`execState` Map.empty) $ go [epclose m $ Set.singleton start]
+  where
+    go todo = unless (null todo) $ do
+        let cur = head todo
+            syms = setEdgeSymbols m cur
+            pairs = map (\sym -> (sym, epclose m $ followSym sym m cur)) $ Set.toList syms
+        p <- get
+        let newStates = filter (not . (`Map.member` p)) $ Set.toList $ Set.fromList $ map snd pairs
+        traverse_ (\(sym, s') -> modify $ insertEdge cur sym s') pairs
+        go (newStates ++ tail todo)
+
