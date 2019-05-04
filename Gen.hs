@@ -6,6 +6,7 @@ import           Control.Arrow (first, second)
 import           Control.Monad.Trans.State.Strict
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Maybe (catMaybes)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 -- mostly stolen from
@@ -18,8 +19,7 @@ data R t
   | Concat (R t) (R t)
   | Many (R t)
 
-data Edge t = E | T t deriving (Eq,Ord,Show)
-type M t s = Map s (Map (Edge t) s)
+type M t s = Map s (Map (Maybe t) s)
 data NFA t s = NFA { start:: s, end:: s, edges:: M t s } deriving (Show)
 
 insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
@@ -37,8 +37,8 @@ compile re = (`evalState` (0, Map.empty)) $ do
         pure cur
       go s g =
         \case
-          Empty -> addedge s E g
-          Symbol sym -> addedge s (T sym) g
+          Empty -> addedge s Nothing g
+          Symbol sym -> addedge s (Just sym) g
           Union r1 r2 -> do
             go s g r1
             go s g r2
@@ -48,9 +48,9 @@ compile re = (`evalState` (0, Map.empty)) $ do
             go tmp g r2
           Many r -> do
             tmp <- newNode
-            addedge s E tmp
+            addedge s Nothing tmp
             go tmp tmp r
-            addedge tmp E g
+            addedge tmp Nothing g
 
 closure f = go
   where
@@ -63,10 +63,10 @@ lookupEdge e m s = do
 followEdge e m = Set.foldl (\set s -> maybe set (`Set.insert` set) $ lookupEdge e m s) Set.empty
 
 followSym :: Ord t => Ord s => t -> M t s -> Set s -> Set s
-followSym = followEdge . T
+followSym = followEdge . Just
 
 epclose :: Ord t => Ord s => M t s -> Set s -> Set s
-epclose = closure . followEdge E
+epclose = closure . followEdge Nothing
 
 eval m cur s = followSym s m $ epclose m cur
 
