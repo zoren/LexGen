@@ -16,10 +16,10 @@ data R t
   | Many (R t)
 
 data Edge t = E | T t deriving (Eq,Ord,Show)
-type M t s = Map.Map s (Map.Map (Edge t) s)
+type M t s = Map s (Map (Edge t) s)
 data NFA t s = NFA { start:: s, end:: s, edges:: M t s } deriving (Show)
 
-compile re = snd $ (`execState` (0, Map.empty)) $ do
+compile re = (`evalState` (0, Map.empty)) $ do
   nstart <- newNode
   nend <- newNode
   go nstart nend re
@@ -46,3 +46,21 @@ compile re = snd $ (`execState` (0, Map.empty)) $ do
             addedge s E tmp
             go tmp tmp r
             addedge tmp E g
+
+closure f = go
+  where
+    go s = let es = f s in if es `Set.isSubsetOf` s then s else go $ Set.union es s
+
+followEdge :: Ord t => Ord s => Edge t -> M t s -> Set s -> Set s
+followEdge e m =
+  Set.unions . fmap (\s -> maybe Set.empty (maybe Set.empty Set.singleton . Map.lookup e) $ Map.lookup s m) . Set.toList
+
+followSym :: Ord t => Ord s => t -> M t s -> Set s -> Set s
+followSym = followEdge . T
+
+epclose :: Ord t => Ord s => M t s -> Set s -> Set s
+epclose = closure . followEdge E
+
+eval m cur s = followSym s m $ epclose m cur
+
+match (NFA start end m) s = Set.member end $ epclose m $ foldl (eval m) (Set.singleton start) s
