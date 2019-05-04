@@ -22,13 +22,15 @@ data Edge t = E | T t deriving (Eq,Ord,Show)
 type M t s = Map s (Map (Edge t) s)
 data NFA t s = NFA { start:: s, end:: s, edges:: M t s } deriving (Show)
 
+insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
+
 compile re = (`evalState` (0, Map.empty)) $ do
   nstart <- newNode
   nend <- newNode
   go nstart nend re
   NFA nstart nend . snd <$> get
     where
-      addedge s e g = modify $ second $ Map.insertWith Map.union s $ Map.singleton e g
+      addedge s e g = modify $ second $ insertEdge s e g
       newNode = do
         cur <- fst <$> get
         modify $ first succ
