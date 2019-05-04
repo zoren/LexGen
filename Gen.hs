@@ -1,4 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
+
+module Gen where
+
 import qualified Data.Map.Strict as Map
 import Control.Monad.Trans.State.Strict
 import Control.Arrow (first, second)
@@ -43,17 +46,3 @@ compile re = snd $ (`execState` (0, Map.empty)) $ do
             addedge s E tmp
             go tmp tmp r
             addedge tmp E g
-
--- test
-range start end = foldr1 Union $ map Symbol [start .. end]
-digit = range '0' '1'
-digits = digit `Concat` Many digit
-
-alpha = range 'a' 'b' `Union` range 'A' 'B'
-alphanum = alpha `Union` digit
-
-iden = alpha `Concat` Many alphanum
-
-ws = Many $ Symbol ' '
-
-token = Many $ foldr1 Union [digits, iden, ws]
