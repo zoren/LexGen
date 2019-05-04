@@ -2,9 +2,12 @@
 
 module Gen where
 
+import           Control.Arrow (first, second)
+import           Control.Monad.Trans.State.Strict
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Control.Monad.Trans.State.Strict
-import Control.Arrow (first, second)
+import           Data.Set (Set)
+import qualified Data.Set as Set
 -- mostly stolen from
 -- https://github.com/alanz/HaRe/blob/master/old/tools/base/parse2/LexerGen/FSM.hs
 
@@ -51,9 +54,11 @@ closure f = go
   where
     go s = let es = f s in if es `Set.isSubsetOf` s then s else go $ Set.union es s
 
-followEdge :: Ord t => Ord s => Edge t -> M t s -> Set s -> Set s
-followEdge e m =
-  Set.unions . fmap (\s -> maybe Set.empty (maybe Set.empty Set.singleton . Map.lookup e) $ Map.lookup s m) . Set.toList
+lookupEdge e m s = do
+  edges <- Map.lookup s m
+  Map.lookup e edges
+
+followEdge e m = Set.foldl (\set s -> maybe set (`Set.insert` set) $ lookupEdge e m s) Set.empty
 
 followSym :: Ord t => Ord s => t -> M t s -> Set s -> Set s
 followSym = followEdge . T
@@ -63,4 +68,4 @@ epclose = closure . followEdge E
 
 eval m cur s = followSym s m $ epclose m cur
 
-match (NFA start end m) s = Set.member end $ epclose m $ foldl (eval m) (Set.singleton start) s
+match (NFA start end m) = Set.member end . epclose m . foldl (eval m) (Set.singleton start)
