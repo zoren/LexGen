@@ -15,7 +15,8 @@ import qualified Data.Set as Set
 -- https://github.com/alanz/HaRe/blob/master/old/tools/base/parse2/LexerGen/FSM.hs
 
 data R t
-  = Empty
+  = Null
+  | Empty
   | Symbol t
   | Union (R t) (R t)
   | Concat (R t) (R t)
@@ -39,6 +40,7 @@ nfa re = (`evalState` (0, Map.empty)) $ do
         pure cur
       go s g =
         \case
+          Null -> pure ()
           Empty -> addedge s Nothing g
           Symbol sym -> addedge s (Just sym) g
           Union r1 r2 -> do
