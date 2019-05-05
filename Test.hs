@@ -16,10 +16,12 @@ ws = Many $ Symbol ' '
 
 token = foldr1 Union [digits, iden, ws]
 
-testNFA =
-  let m' = match $ nfa token in
-  map m' ["123", "abc", "ab34", "   "] ++ map (not . m') ["$", "_", "34a"]
+tester m' = and $ map m' ["123", "abc", "ab34", "   "] ++ map (not . m') ["$", "_", "34a"]
 
-testDFA =
-  let m' = matchDFA $ dfa $ nfa token in
-  map m' ["123", "abc", "ab34", "   "] ++ map (not . m') ["$", "_", "34a"]
+testDeriv = tester $ matchDeriv token
+
+testNFA = tester $ match $ nfa token
+
+testDFA = tester $ matchDFA $ dfa $ nfa token
+
+test = and [testDeriv, testNFA, testDFA]

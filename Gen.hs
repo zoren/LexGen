@@ -11,8 +11,6 @@ import qualified Data.Map.Strict as Map
 import           Data.Maybe (catMaybes)
 import           Data.Set (Set)
 import qualified Data.Set as Set
--- mostly stolen from
--- https://github.com/alanz/HaRe/blob/master/old/tools/base/parse2/LexerGen/FSM.hs
 
 data R t
   = Null
@@ -21,12 +19,45 @@ data R t
   | Union (R t) (R t)
   | Concat (R t) (R t)
   | Many (R t)
+  deriving (Eq)
+
+-- stolen from http://matt.might.net/articles/implementation-of-regular-expression-matching-in-scheme-with-derivatives/
+deriv c =
+  \case
+    Null -> Null
+    Empty -> Null
+    Symbol c' -> if c == c' then Empty else Null
+    Union r1 r2 -> deriv c r1 `Union` deriv c r2
+    Concat r1 r2 -> (d r1 `Concat` deriv c r2) `Union` (deriv c r1 `Concat` r2)
+      where
+        d =
+          \case
+            Null -> Null
+            Empty -> Empty
+            Symbol {} -> Null
+            Union r1 r2 -> d r1 `Union` d r2
+            Concat r1 r2 -> d r1 `Concat` d r2
+            Many {} -> Empty
+    Many r -> deriv c r `Concat` Many r
+
+nullRE =
+  \case
+    Null -> False
+    Empty -> True
+    Symbol {} -> False
+    Union r1 r2 -> nullRE r1 || nullRE r2
+    Concat r1 r2 -> nullRE r1 && nullRE r2
+    Many {} -> True
+
+matchDeriv r = nullRE . foldl (flip deriv) r
 
 type M t s = Map s (Map (Maybe t) s)
 data NFA t s = NFA s (Set s) (M t s) deriving (Show)
 
 insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
 
+-- mostly stolen from
+-- https://github.com/alanz/HaRe/blob/master/old/tools/base/parse2/LexerGen/FSM.hs
 nfa re = (`evalState` (0, Map.empty)) $ do
   initial <- newNode
   accepting <- newNode
