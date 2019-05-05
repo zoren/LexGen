@@ -22,15 +22,15 @@ data R t
   | Many (R t)
 
 type M t s = Map s (Map (Maybe t) s)
-data NFA t s = NFA { start:: s, end:: s, edges:: M t s } deriving (Show)
+data NFA t s = NFA s s (M t s) deriving (Show)
 
 insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
 
 nfa re = (`evalState` (0, Map.empty)) $ do
-  nstart <- newNode
-  nend <- newNode
-  go nstart nend re
-  NFA nstart nend . snd <$> get
+  initial <- newNode
+  accepting <- newNode
+  go initial accepting re
+  NFA initial accepting . snd <$> get
     where
       addedge s e g = modify $ second $ insertEdge s e g
       newNode = do
@@ -72,7 +72,7 @@ epclose = closure . followEdge Nothing
 
 eval m cur s = followSym s m $ epclose m cur
 
-match (NFA start end m) = Set.member end . epclose m . foldl (eval m) (Set.singleton start)
+match (NFA initial accepting m) = Set.member accepting . epclose m . foldl (eval m) (Set.singleton initial)
 
 setEdges :: Ord t => Ord s => M t s -> Set s -> Set (Maybe t)
 setEdges m = Set.foldl (\set s -> foldr Set.insert set $ maybe [] Map.keys $ Map.lookup s m) Set.empty
@@ -82,21 +82,21 @@ setEdgeSymbols m s = Set.fromList $ catMaybes $ Set.toList $ setEdges m s
 type MD t s = Map (Set s) (Map t (Set s))
 data DFA t s = DFA (Set s) (Set s) (MD t s) deriving (Show)
 
-matchDFA (DFA start end dfaEdges) = go start
+matchDFA (DFA initial accepting dfaEdges) = go initial
   where
     go cur =
       \case
-        [] -> end `Set.isSubsetOf` cur
+        [] -> accepting `Set.isSubsetOf` cur
         s:ss ->
           case lookupEdge s dfaEdges cur of
             Nothing -> False
             Just new -> go new ss
 
-dfa (NFA start end m) =
+dfa (NFA initial accepting m) =
   DFA
-  (epclose m $ Set.singleton start)
-  (epclose m $ Set.singleton end) $
-  (`execState` Map.empty) $ go [epclose m $ Set.singleton start]
+  (epclose m $ Set.singleton initial)
+  (epclose m $ Set.singleton accepting) $
+  (`execState` Map.empty) $ go [epclose m $ Set.singleton initial]
   where
     go todo = unless (null todo) $ do
         let cur = head todo
