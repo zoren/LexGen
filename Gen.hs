@@ -139,4 +139,3 @@ dfa (NFA initial accepting m) =
         let newStates = filter (not . (`Map.member` p)) $ Set.toList $ Set.fromList $ map snd pairs
         traverse_ (\(sym, s') -> modify $ insertEdge cur sym s') pairs
         go (newStates ++ tail todo)
-
