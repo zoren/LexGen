@@ -52,7 +52,7 @@ nullRE =
 matchDeriv r = nullRE . foldl (flip deriv) r
 
 type M t s = Map s (Map t s)
-data NFA t s = NFA s (Set s) (M (Maybe t) s) deriving (Show)
+data NFA t s = NFA (Set s) (Set s) (M (Maybe t) s) deriving (Show)
 
 insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
 
@@ -62,7 +62,7 @@ nfa re = (`evalState` (0, Map.empty)) $ do
   initial <- newNode
   accepting <- newNode
   go initial accepting re
-  NFA initial (Set.singleton accepting) . snd <$> get
+  NFA (Set.singleton initial) (Set.singleton accepting) . snd <$> get
     where
       addedge s e g = modify $ second $ insertEdge s e g
       newNode = do
@@ -105,7 +105,7 @@ epclose = closure . followEdge Nothing
 
 eval m cur s = followSym s m $ epclose m cur
 
-match (NFA initial accepting m) = Set.isSubsetOf accepting . epclose m . foldl (eval m) (Set.singleton initial)
+match (NFA initial accepting m) = Set.isSubsetOf accepting . epclose m . foldl (eval m) initial
 
 setEdges :: Ord t => Ord s => M t s -> Set s -> Set t
 setEdges m = Set.foldl (\set s -> foldr Set.insert set $ maybe [] Map.keys $ Map.lookup s m) Set.empty
@@ -126,9 +126,9 @@ matchDFA (DFA initial accepting dfaEdges) = go initial
 
 dfa (NFA initial accepting m) =
   DFA
-  (epclose m $ Set.singleton initial)
+  (epclose m initial)
   (epclose m accepting) $
-  (`execState` Map.empty) $ go [epclose m $ Set.singleton initial]
+  (`execState` Map.empty) $ go [epclose m initial]
   where
     go todo = unless (null todo) $ do
         let cur = head todo
