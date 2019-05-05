@@ -51,8 +51,8 @@ nullRE =
 
 matchDeriv r = nullRE . foldl (flip deriv) r
 
-type M t s = Map s (Map (Maybe t) s)
-data NFA t s = NFA s (Set s) (M t s) deriving (Show)
+type M t s = Map s (Map t s)
+data NFA t s = NFA s (Set s) (M (Maybe t) s) deriving (Show)
 
 insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
 
@@ -97,23 +97,22 @@ lookupEdge e m s = do
 
 followEdge e m = Set.foldl (\set s -> maybe set (`Set.insert` set) $ lookupEdge e m s) Set.empty
 
-followSym :: Ord t => Ord s => t -> M t s -> Set s -> Set s
+followSym :: Ord t => Ord s => t -> M (Maybe t) s -> Set s -> Set s
 followSym = followEdge . Just
 
-epclose :: Ord t => Ord s => M t s -> Set s -> Set s
+epclose :: Ord t => Ord s => M (Maybe t) s -> Set s -> Set s
 epclose = closure . followEdge Nothing
 
 eval m cur s = followSym s m $ epclose m cur
 
 match (NFA initial accepting m) = Set.isSubsetOf accepting . epclose m . foldl (eval m) (Set.singleton initial)
 
-setEdges :: Ord t => Ord s => M t s -> Set s -> Set (Maybe t)
+setEdges :: Ord t => Ord s => M t s -> Set s -> Set t
 setEdges m = Set.foldl (\set s -> foldr Set.insert set $ maybe [] Map.keys $ Map.lookup s m) Set.empty
 
 setEdgeSymbols m s = Set.fromList $ catMaybes $ Set.toList $ setEdges m s
 
-type MD t s = Map (Set s) (Map t (Set s))
-data DFA t s = DFA (Set s) (Set s) (MD t s) deriving (Show)
+data DFA t s = DFA (Set s) (Set s) (M t (Set s)) deriving (Show)
 
 matchDFA (DFA initial accepting dfaEdges) = go initial
   where
