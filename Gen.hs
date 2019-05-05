@@ -126,10 +126,11 @@ matchDFA (DFA initial accepting dfaEdges) = go initial
 
 dfa (NFA initial accepting m) =
   DFA
-  (epclose m initial)
+  epinit
   (epclose m accepting) $
-  (`execState` Map.empty) $ go [epclose m initial]
+  (`execState` Map.empty) $ go [epinit]
   where
+    epinit = epclose m initial
     go todo = unless (null todo) $ do
         let cur = head todo
             syms = setEdgeSymbols m cur
