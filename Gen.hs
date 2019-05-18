@@ -91,11 +91,11 @@ closure f = go
   where
     go s = let es = f s in if es `Set.isSubsetOf` s then s else go $ Set.union es s
 
-lookupEdge e m s = do
+lookupEdge e s m = do
   edges <- Map.lookup s m
   Map.lookup e edges
 
-followEdge e m = Set.foldl (\set s -> maybe set (`Set.insert` set) $ lookupEdge e m s) Set.empty
+followEdge e m = Set.foldl (\set s -> maybe set (`Set.insert` set) $ lookupEdge e s m) Set.empty
 
 followSym :: Ord t => Ord s => t -> M (Maybe t) s -> Set s -> Set s
 followSym = followEdge . Just
@@ -119,7 +119,7 @@ matchDFA (DFA initial accepting dfaEdges) = go initial
     go cur =
       \case
         [] -> accepting `Set.isSubsetOf` cur
-        s:ss -> maybe False (\new -> go new ss) $ lookupEdge s dfaEdges cur
+        s:ss -> maybe False (\new -> go new ss) $ lookupEdge s cur dfaEdges
 
 dfa (NFA initial accepting m) =
   DFA
