@@ -59,33 +59,32 @@ insertEdge s e g = Map.insertWith Map.union s $ Map.singleton e g
 -- mostly stolen from
 -- https://github.com/alanz/HaRe/blob/master/old/tools/base/parse2/LexerGen/FSM.hs
 nfa re = (`evalState` (0, Map.empty)) $ do
+  let
+    newNode = do
+      cur <- fst <$> get
+      modify $ first succ
+      pure cur
+    addedge s e g = modify $ second $ insertEdge s e g
+    go s g = \case
+        Null -> pure ()
+        Empty -> addedge s Nothing g
+        Symbol sym -> addedge s (Just sym) g
+        Union r1 r2 -> do
+          go s g r1
+          go s g r2
+        Concat r1 r2 -> do
+          tmp <- newNode
+          go s tmp r1
+          go tmp g r2
+        Many r -> do
+          tmp <- newNode
+          addedge s Nothing tmp
+          go tmp tmp r
+          addedge tmp Nothing g
   initial <- newNode
   accepting <- newNode
   go initial accepting re
   NFA (Set.singleton initial) (Set.singleton accepting) . snd <$> get
-    where
-      addedge s e g = modify $ second $ insertEdge s e g
-      newNode = do
-        cur <- fst <$> get
-        modify $ first succ
-        pure cur
-      go s g =
-        \case
-          Null -> pure ()
-          Empty -> addedge s Nothing g
-          Symbol sym -> addedge s (Just sym) g
-          Union r1 r2 -> do
-            go s g r1
-            go s g r2
-          Concat r1 r2 -> do
-            tmp <- newNode
-            go s tmp r1
-            go tmp g r2
-          Many r -> do
-            tmp <- newNode
-            addedge s Nothing tmp
-            go tmp tmp r
-            addedge tmp Nothing g
 
 closure f = go
   where
