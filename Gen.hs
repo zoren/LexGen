@@ -135,3 +135,11 @@ dfa (NFA initial accepting m) =
         let newStates = filter (not . (`Map.member` p)) $ Set.toList $ Set.fromList $ map snd pairs
         traverse_ (\(sym, s') -> modify $ insertEdge cur sym s') pairs
         go (newStates ++ tail todo)
+
+renumberDFA (DFA initial accepting dfaEdges) =
+  let
+    states = Set.toList $ Set.fromList $ initial : accepting : Map.keys dfaEdges ++ concatMap Map.elems (Map.elems dfaEdges)
+    m = Map.fromList $ zip states [0..]
+    l k = Map.findWithDefault (error "state not found") k m
+  in
+    DFA (l initial) (l accepting) $ Map.fromList $ map (l *** Map.map l) $ Map.toList dfaEdges
