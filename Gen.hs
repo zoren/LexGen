@@ -119,10 +119,7 @@ matchDFA (DFA initial accepting dfaEdges) = go initial
     go cur =
       \case
         [] -> accepting `Set.isSubsetOf` cur
-        s:ss ->
-          case lookupEdge s dfaEdges cur of
-            Nothing -> False
-            Just new -> go new ss
+        s:ss -> maybe False (\new -> go new ss) $ lookupEdge s dfaEdges cur
 
 dfa (NFA initial accepting m) =
   DFA
